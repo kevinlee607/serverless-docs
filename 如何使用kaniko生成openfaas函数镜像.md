@@ -60,7 +60,7 @@ func Handle(req []byte) string {
 		return fmt.Sprintln("wrong fromat was provided, error:", err.Error())
 	}
 	taxHomePay := userInfo.Salary - (userInfo.Salary * userInfo.TaxRate)
-	return fmt.Sprintf("Hello, %s. 你的税后工资为: %f", string(req), taxHomePay)
+	return fmt.Sprintf("Hello, %s. 你的税后工资为: %f", string(userInfo.UserName), taxHomePay)
 }
 ```
 
@@ -90,7 +90,7 @@ kubectl create configmap docker-config -n openfaas --from-file=/root/.docker/con
 
 qinstor的下载解压，我做了一个镜像用来初始化kaniko容器，dockerhub.qingcloud.com/openfaas/qsexec:v0.0.4，源码地址：
 
-下载kaniko镜像，**不要自己制作kaniko镜像，这个浪费了我很长时间，用官方镜像**，镜像地址：gcr.io/kaniko-project/executor:latest，国内可能下载不了，可以使用搬梯子，下载然后同save --》 import到国内自己的私有镜像库里。例子如下：
+下载kaniko镜像，**不要自己制作kaniko镜像，这个浪费了我很长时间，用官方镜像**，镜像地址：gcr.io/kaniko-project/executor:latest，国内可能下载不了，可以使用梯子，下载然后同save --》 import到国内自己的私有镜像库里。例子如下：
 
 ```
 ssh root@<墙外docker主机>
@@ -168,15 +168,46 @@ kubectl create -f kaniko.yaml -n openfaas
 ```
 kubectl create secret docker-registry dockerhub \
     -n openfaas-fn \
+    --docker-server=$DOCKER_SERVER_URL \
     --docker-username=$DOCKER_USERNAME \
     --docker-password=$DOCKER_PASSWORD \
     --docker-email=$DOCKER_EMAIL
 ```
 
-部署参数需要有：
+注意函数部署时需要此仓库密钥名称：
 
 ```
 secrets:
       - dockerhub
+```
+
+## 部署函数
+
+### 通过ui部署
+
+访问openfaas UI地址如： http://gateway.clouden.io:31068/ui,   **注意此UI地址根据实际情况进行修改。**
+
+在部署页面中主要修改以下参数：
+
+```
+Docker image： dockerhub.qingcloud.com/openfaas/test:v0.1   # 此处填写docker image的镜像地址。 必填
+Function name: testinfo                                     # 此处填写函数名称，需faas内全局唯一。必填
+Function process： testinfo                                 # 非必填，此处填写faas的主执行函数名称，建议不填写。选填
+Network:                                                    # 为docker swarm参数，k8s不需要。选填
+Environment Variables:                                # 系统变量。选填。classic-watchdog 参考：
+                                                      # https://github.com/openfaas/workshop/blob/master/lab8.md
+                                                      # of-watch:https://github.com/alexellis/go-long/blob/master/stack.yml
+Secrect:  dockerhub                                   # 使用的k8s的密钥。私有docker仓库必填。
+Labels：                                              # 开业参考：https://docs.openfaas.com/architecture/autoscaling/
+```
+
+### 如何请求函数
+
+使用post访问函数。地址为：http://gateway.clouden.io:31068/function/testinfo
+
+使用示例如下：
+
+```
+curl -X POST -d '{"username":"test","salary":5000, "taxrate":0.15}' http://gateway.clouden.io:31068/function/testinfo1
 ```
 
